@@ -6,7 +6,6 @@ public class Death : MonoBehaviour {
 
 	public GameObject waypointsParent;
 	public GameObject player;
-	public CharacterController controller;
 
 	public float walkSpeed;
 	public float runSpeed;
@@ -14,11 +13,12 @@ public class Death : MonoBehaviour {
 
 	private Path path;
 	private int pathIndex;
-
+	
+	private Rigidbody body;
 	private Animator animator;
 
 	void Start () {
-		controller = GetComponent<CharacterController> ();
+		body = GetComponent<Rigidbody> ();
 		animator = GetComponentInChildren<Animator> ();
 
 		Seeker seeker = GetComponent<Seeker>();
@@ -55,7 +55,7 @@ public class Death : MonoBehaviour {
 	// Update is called once per frame
 	void Update () {
 		Vector3 dir = UpdateDir ();
-		controller.SimpleMove (dir);
+		body.velocity = dir;
 		
 		Shared.UpdateAnimator (animator, dir);
 	}
