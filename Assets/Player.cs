@@ -29,6 +29,6 @@ public class Player : MonoBehaviour {
 		}
 		
 		body.velocity = dir;
-		Shared.UpdateAnimator (animator, dir);
+		Shared.UpdateAnimator (animator, dir.magnitude, dir);
 	}
 }

@@ -14,6 +14,7 @@ public class Death : MonoBehaviour {
 		private int waypointIndex;
 
 		public FollowWaypointsState (Death d) {
+			Debug.Log ("follow waypoints");
 			death = d;
 
 			GameObject waypointsParent = death.waypointsParent;
@@ -44,31 +45,91 @@ public class Death : MonoBehaviour {
 
 	class FollowPlayerState : State {
 		private Death death;
+		private Vector3 lastGoal;
 
 		public FollowPlayerState (Death d) {
+			Debug.Log ("follow player");
 			death = d;
+			death.flashlight.color = Color.red;
 		}
 
 		public State Update () {
+			Vector3 goal = death.player.transform.position;
+			death.MoveTowards (goal, true);
+			
+			if (!death.SeesPlayer ()) {
+				return new FollowLostState(death, goal);
+			}
+
+			lastGoal = goal;
+			return this;
+		}
+	}
+
+	class FollowLostState : State {
+		private Death death;
+		private Vector3 goal;
+
+		public FollowLostState (Death d, Vector3 g) {
+			Debug.Log ("follow lost");
+			death = d;
+			goal = g;
+		}
+		
+		public State Update () {
+			death.MoveTowards (goal, true);
+			
+			if (death.SeesPlayer ()) {
+				return new FollowPlayerState(death);
+			}
+
+			if (death.IsNear (goal)) {
+				return new LookState (death);
+			}
+
 			return this;
 		}
 	}
 	
+	class LookState : State {
+		private Death death;
+		
+		public LookState (Death d) {
+			Debug.Log ("look");
+			death = d;
+		}
+		
+		public State Update () {
+			death.MoveStop ();
+			death.RotateFacing (360f);
+
+			if (death.SeesPlayer ()) {
+				return new FollowPlayerState(death);
+			}
+
+			return this;
+		}
+	}
+
+	// the world
 	public GameObject player;
 	public GameObject waypointsParent;
 
+	// public parameters
 	public float walkSpeed;
 	public float runSpeed;
 	public float proximityDistance;
+	public float fov;
 
-	private bool computingPathLock;
-	private Path path;
-	private int pathIndex;
+	// me
+	private Vector3 facing;
+	private CharacterController controller; 
 	
-	private CharacterController controller;
+	// rendering
 	private Light flashlight;
 	private Animator animator;
 
+	// my state
 	private State currentState;
 
 	void Start () {
@@ -76,26 +137,21 @@ public class Death : MonoBehaviour {
 		flashlight = GetComponentInChildren<Light> ();
 		animator = GetComponentInChildren<Animator> ();
 		currentState = new FollowWaypointsState (this);
-
-		Seeker seeker = GetComponent<Seeker>();
-		seeker.StartPath (transform.position, player.transform.position, OnPathComplete);
 	}
 
-	void OnPathComplete (Path p) {
-		computingPathLock = false;
+	void RotateFacing (float angularVelocity) {
+		Quaternion rotation = Quaternion.AngleAxis(angularVelocity * Time.deltaTime, Vector3.up);
+		SetFacing (rotation * facing);
+	}
 
-		if (!p.error) {
-			path = p;
-			pathIndex = 0;
-		} else {
-			Debug.LogError("Couldn't find path: " + path);
+	void SetFacing (Vector3 dir) {
+		if (dir.magnitude > 0.1) {
+			facing = dir.normalized;
 		}
 	}
 	
-	void UpdateFlashlight (Vector3 dir) {
-		if (dir.magnitude > 0.1) {
-			flashlight.transform.LookAt (transform.position + dir);
-		}
+	void MoveStop () {
+		controller.SimpleMove (Vector3.zero);
 	}
 
 	void MoveTowards (Vector3 goal, bool running) {
@@ -111,8 +167,7 @@ public class Death : MonoBehaviour {
 		
 		controller.SimpleMove (dir);
 
-		UpdateFlashlight (dir);
-		Shared.UpdateAnimator (animator, dir);
+		SetFacing (dir);
 	}
 
 	float DistanceTo (Vector3 other) {
@@ -125,21 +180,11 @@ public class Death : MonoBehaviour {
 		return DistanceTo (other) < proximityDistance;
 	}
 
-	void FollowPath () {
-		if (path == null) {	return; }
-		if (pathIndex >= path.vectorPath.Count) { return; }
-		
-		Vector3 goal = path.vectorPath [pathIndex];
-		MoveTowards (goal, false);
-
-		if (IsNear (goal)) {
-			pathIndex ++;
-		}
-	}
-
 	bool SeesPlayer () {
 		var dir = player.transform.position - transform.position;
 		dir.Normalize();
+
+		if (Vector3.Angle(dir, facing) > fov) { return false; }
 		
 		Ray ray = new Ray (transform.position, dir);
 		RaycastHit hit;
@@ -155,7 +200,9 @@ public class Death : MonoBehaviour {
 
 	void Update () {
 		currentState = currentState.Update ();
-		//FollowPath ();
+		
+		Shared.UpdateAnimator (animator, controller.velocity.magnitude, facing);
+		flashlight.transform.LookAt (transform.position + facing);
 	}
 
 	void OnControllerColliderHit (ControllerColliderHit hit) {
