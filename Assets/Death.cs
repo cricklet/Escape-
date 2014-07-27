@@ -93,6 +93,7 @@ public class Death : MonoBehaviour {
 			Debug.Log ("follow player");
 			death = d;
 			death.flashlight.color = Color.red;
+			Music.Instance.Lock(death.GetInstanceID());
 		}
 
 		public State Update () {
@@ -100,9 +101,11 @@ public class Death : MonoBehaviour {
 			death.MoveTowards (goal, true);
 			
 			if (!death.SeesPlayer ()) {
+				death.flashlight.color = Color.white;
+				Music.Instance.UnLock(death.GetInstanceID());
 				return new FollowLostState(death, goal);
 			}
-
+			
 			lastGoal = goal;
 			return this;
 		}
@@ -160,7 +163,7 @@ public class Death : MonoBehaviour {
 	}
 
 	// the world
-	public GameObject player;
+	private GameObject player;
 	public GameObject waypointsParent;
 
 	// public parameters
@@ -182,6 +185,7 @@ public class Death : MonoBehaviour {
 	private State currentState;
 
 	void Start () {
+		player = GameObject.Find ("Player");
 		controller = GetComponent<CharacterController> ();
 		flashlight = GetComponentInChildren<Light> ();
 		animator = GetComponentInChildren<Animator> ();
