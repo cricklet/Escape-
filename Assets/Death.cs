@@ -73,12 +73,16 @@ public class Death : MonoBehaviour {
 			Vector3 goal = waypoints[waypointIndex].position;
 			death.MoveTowards (goal, false);
 
-			if (death.IsNear (goal)) {
+			if (death.IsNear (goal, 0.5f)) {
 				waypointIndex  = (waypointIndex + 1) % waypoints.Length;
 			}
-
+			
 			if (death.SeesPlayer ()) {
 				return new FollowPlayerState(death);
+			}
+			
+			if (death.HearsPlayer ()) {
+				return new FollowLostState(death, death.player.transform.position);
 			}
 
 			return this;
@@ -90,10 +94,11 @@ public class Death : MonoBehaviour {
 		private Vector3 lastGoal;
 
 		public FollowPlayerState (Death d) {
-			Debug.Log ("follow player");
 			death = d;
 			death.flashlight.color = Color.red;
-			Music.Instance.Lock(death.GetInstanceID());
+			if (Music.Instance) {
+				Music.Instance.Lock(death.GetInstanceID());
+			}
 		}
 
 		public State Update () {
@@ -102,8 +107,14 @@ public class Death : MonoBehaviour {
 			
 			if (!death.SeesPlayer ()) {
 				death.flashlight.color = Color.white;
-				Music.Instance.UnLock(death.GetInstanceID());
+				if (Music.Instance) {
+					Music.Instance.UnLock(death.GetInstanceID());
+				}
 				return new FollowLostState(death, goal);
+			}
+			
+			if (death.IsNear(death.player.transform.position, 1f)) {
+				death.game.SendMessage("Lose");
 			}
 			
 			lastGoal = goal;
@@ -127,11 +138,11 @@ public class Death : MonoBehaviour {
 			if (death.SeesPlayer ()) {
 				return new FollowPlayerState(death);
 			}
-
-			if (death.IsNear (goal)) {
+			
+			if (death.IsNear (goal, 0.5f)) {
 				return new LookState (death);
 			}
-
+			
 			return this;
 		}
 	}
@@ -153,25 +164,31 @@ public class Death : MonoBehaviour {
 			if (death.SeesPlayer ()) {
 				return new FollowPlayerState(death);
 			}
-
+			
 			if (Time.time > finish) {
 				return new FollowWaypointsState(death);
 			}
-
+			
+			if (death.HearsPlayer ()) {
+				return new FollowLostState(death, death.player.transform.position);
+			}
+			
 			return this;
 		}
 	}
 
 	// the world
 	private GameObject player;
+	private Player playerScript;
 	public GameObject waypointsParent;
+	private Game game;
 
 	// public parameters
 	public float walkSpeed;
 	public float runSpeed;
-	public float proximityDistance;
 	public float fov;
 	public float angularSpeed;
+	public float hearingDistance;
 
 	// me
 	private Vector3 facing;
@@ -185,7 +202,9 @@ public class Death : MonoBehaviour {
 	private State currentState;
 
 	void Start () {
+		game = GameObject.Find ("Game").GetComponent<Game>();
 		player = GameObject.Find ("Player");
+		playerScript = player.GetComponent<Player> ();
 		controller = GetComponent<CharacterController> ();
 		flashlight = GetComponentInChildren<Light> ();
 		animator = GetComponentInChildren<Animator> ();
@@ -229,8 +248,8 @@ public class Death : MonoBehaviour {
 		return Vector3.Distance (current, other);
 	}
 
-	bool IsNear(Vector3 other) {
-		return DistanceTo (other) < proximityDistance;
+	bool IsNear(Vector3 other, float dist) {
+		return DistanceTo (other) < dist;
 	}
 
 	bool SeesPlayer () {
@@ -251,7 +270,24 @@ public class Death : MonoBehaviour {
 		return false;
 	}
 
+	private float nextListen = float.MinValue;
+	bool HearsPlayer () {
+		if (Time.time < nextListen) {
+			return false;
+		}
+		if (playerScript.IsRunning() && DistanceTo(player.transform.position) < hearingDistance) {
+			nextListen = Time.time + 1f;
+			return true;
+		}
+		
+		return false;
+	}
+
 	void Update () {
+		if (game.IsPaused()) {
+			return;
+		}
+		
 		currentState = currentState.Update ();
 		
 		Shared.UpdateAnimator (animator, controller.velocity.magnitude, facing);

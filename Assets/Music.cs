@@ -13,7 +13,7 @@ public class Music : MonoBehaviour {
 	public float volumeRate;
 
 	private float lockVolume;
-	private int[] locks;
+	private int[] locks = new int[10];
 	
 	void Awake () {
 		if (instance != null) {
@@ -25,7 +25,6 @@ public class Music : MonoBehaviour {
 	}
 	
 	void Start () {
-		locks = new int[10];
 		for (int i = 0; i < locks.Length; i ++) {
 			locks[i] = -1;
 		}

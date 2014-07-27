@@ -2,17 +2,18 @@
 using System.Collections;
 
 public class Exit : MonoBehaviour {
-
+	
+	private Game game;
 	private GameObject player;
 	
 	public float doorOpenSpeed;
 	public float proximityDist;
-	public string nextScene;
 
 	private float doorSize = 1f;
 
 	void Start () {
 		player = GameObject.Find ("Player");
+		game = GameObject.Find ("Game").GetComponent<Game>();
 	}
 
 	void Update () {
@@ -26,7 +27,7 @@ public class Exit : MonoBehaviour {
 		transform.localScale = new Vector3 (1.1f, doorSize * 1.1f, doorSize * 1.1f);
 		
 		if (doorSize == 0f) {
-			Application.LoadLevel (nextScene);
+			game.Win();
 		}
 	}
 }
