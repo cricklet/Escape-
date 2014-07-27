@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Linq;
 using Pathfinding;
 
 public class Death : MonoBehaviour {
@@ -18,16 +19,57 @@ public class Death : MonoBehaviour {
 			death = d;
 
 			GameObject waypointsParent = death.waypointsParent;
+
 			int i = 0;
 			waypoints = new Transform[waypointsParent.transform.childCount];
 			foreach (Transform waypoint in waypointsParent.transform) {
 				waypoints[i] = waypoint;
 				i ++;
 			}
-			waypointIndex = 0;
+
+			waypointIndex = ChooseWaypoint();
+		}
+
+		private int ChooseWaypoint() {
+			float[] dots = new float[waypoints.Length];
+			float[] dists = new float[waypoints.Length];
+
+			for (int i = 0; i < waypoints.Length; i ++) {
+				Transform waypoint = waypoints[i];
+				Transform prevWaypoint = waypoints[(i + waypoints.Length - 1) % waypoints.Length];
+				
+				Vector3 waypointDir = (waypoint.position - death.transform.position).normalized;
+				Vector3 pathDir = (waypoint.position - prevWaypoint.position).normalized;
+				float dist = death.DistanceTo(waypoint.position);
+
+				dots[i] = Vector3.Dot(waypointDir, pathDir);
+				dists[i] = dist;
+			}
+
+			float[] scores = new float[waypoints.Length];
+			float maxDist = dists.Max ();
+			float minDot = dots.Max ();
+			for (int i = 0; i < dists.Length; i ++) {
+				scores[i] = (1 + maxDist - dists[i]) * (1 + dots[i] - minDot);
+			}
+
+			float maxScore = 0;
+			int maxIndex = 0;
+			for (int i = 0; i < scores.Length; i ++) {
+				if (scores[i] > maxScore) {
+					maxScore = scores[i];
+					maxIndex = i;
+				}
+			}
+
+			return maxIndex;
 		}
 
 		public State Update () {
+			if (waypoints.Length == 0) {
+				return this;
+			}
+
 			Vector3 goal = waypoints[waypointIndex].position;
 			death.MoveTowards (goal, false);
 
@@ -93,18 +135,24 @@ public class Death : MonoBehaviour {
 	
 	class LookState : State {
 		private Death death;
+		private float finish;
 		
 		public LookState (Death d) {
 			Debug.Log ("look");
 			death = d;
+			finish = Time.time + 360f / death.angularSpeed;
 		}
 		
 		public State Update () {
 			death.MoveStop ();
-			death.RotateFacing (360f);
+			death.RotateFacing (death.angularSpeed);
 
 			if (death.SeesPlayer ()) {
 				return new FollowPlayerState(death);
+			}
+
+			if (Time.time > finish) {
+				return new FollowWaypointsState(death);
 			}
 
 			return this;
@@ -120,6 +168,7 @@ public class Death : MonoBehaviour {
 	public float runSpeed;
 	public float proximityDistance;
 	public float fov;
+	public float angularSpeed;
 
 	// me
 	private Vector3 facing;
