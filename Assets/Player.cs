@@ -10,6 +10,7 @@ public class Player : MonoBehaviour {
 	
 	private Rigidbody body;
 	private Animator animator;
+	private Camera cam;
 	
 	private AudioSource runSound;
 	private bool running = false;
@@ -20,6 +21,7 @@ public class Player : MonoBehaviour {
 
 	void Start () {
 		game = GameObject.Find ("Game").GetComponent<Game>();
+		cam = GetComponentInChildren<Camera> ();
 		body = GetComponent<Rigidbody> ();
 		animator = GetComponentInChildren<Animator> ();
 		runSound = GetComponent<AudioSource> ();
@@ -30,6 +32,13 @@ public class Player : MonoBehaviour {
 			body.velocity = Vector3.zero;
 			Shared.UpdateAnimator (animator, 0, Vector3.zero);
 			return;
+		}
+		
+		if (Input.GetKeyDown ("+") || Input.GetKeyDown ("=")) {
+			cam.orthographicSize -= 1;
+		}
+		if (Input.GetKeyDown ("-") || Input.GetKeyDown ("_")) {
+			cam.orthographicSize += 1;
 		}
 		
 		var dir = new Vector3(0,0,0);

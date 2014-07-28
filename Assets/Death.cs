@@ -130,16 +130,19 @@ public class Death : MonoBehaviour {
 			Debug.Log ("follow lost");
 			death = d;
 			goal = g;
+			death.flashlight.color = Color.yellow;
 		}
 		
 		public State Update () {
 			death.MoveTowards (goal, true);
 			
 			if (death.SeesPlayer ()) {
+				death.flashlight.color = Color.white;
 				return new FollowPlayerState(death);
 			}
 			
 			if (death.IsNear (goal, 0.5f)) {
+				death.flashlight.color = Color.white;
 				return new LookState (death);
 			}
 			
